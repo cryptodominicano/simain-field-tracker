@@ -28,9 +28,13 @@ const validateFile = (file) => {
     throw new Error(`El archivo es demasiado grande (${fileSizeMB.toFixed(1)}MB). El tamaño máximo es ${MAX_FILE_SIZE_MB}MB.`);
   }
 
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
-  if (!allowedTypes.includes(file.type)) {
-    throw new Error(`Tipo de archivo no permitido: ${file.type}. Use JPG, PNG, GIF, WebP o PDF.`);
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'];
+  // Some mobile browsers don't set type correctly, so also check extension
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'pdf'];
+
+  if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(ext)) {
+    throw new Error(`Tipo de archivo no permitido: ${file.type || ext}. Use JPG, PNG, GIF, WebP, HEIC o PDF.`);
   }
 
   return true;

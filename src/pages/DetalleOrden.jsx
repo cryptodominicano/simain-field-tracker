@@ -150,12 +150,41 @@ export default function DetalleOrden() {
   };
 
   const handlePhotoCapture = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const file = e.target.files?.[0];
+    if (!file) {
+      console.log('No file selected');
+      return;
+    }
+
+    console.log('File selected:', {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      lastModified: file.lastModified
+    });
 
     setUploadingPhoto(true);
-    
+
     try {
+      // Validate file type on mobile (some browsers return empty type)
+      let fileToUpload = file;
+      if (!file.type || file.type === '') {
+        // Try to determine type from extension
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        const mimeTypes = {
+          'jpg': 'image/jpeg',
+          'jpeg': 'image/jpeg',
+          'png': 'image/png',
+          'gif': 'image/gif',
+          'webp': 'image/webp',
+          'heic': 'image/heic',
+          'heif': 'image/heif'
+        };
+        const mimeType = mimeTypes[ext] || 'image/jpeg';
+        console.log('File type empty, using:', mimeType);
+        fileToUpload = new File([file], file.name, { type: mimeType });
+      }
+
       // Get current location
       let lat, lon;
       try {
@@ -164,12 +193,14 @@ export default function DetalleOrden() {
         });
         lat = position.coords.latitude;
         lon = position.coords.longitude;
-      } catch (e) {
-        console.log('Could not get location');
+      } catch (locError) {
+        console.log('Could not get location:', locError);
       }
 
+      console.log('Starting upload...');
       // Upload file
-      const { file_url } = await integrations.Core.UploadFile({ file });
+      const { file_url } = await integrations.Core.UploadFile({ file: fileToUpload });
+      console.log('Upload successful:', file_url);
 
       // Save photo record
       await entities.fotos.create({
@@ -193,6 +224,8 @@ export default function DetalleOrden() {
       toast.error(error.message || 'Error al subir la foto');
     } finally {
       setUploadingPhoto(false);
+      // Reset the input so the same file can be selected again
+      e.target.value = '';
     }
   };
 
@@ -446,22 +479,44 @@ export default function DetalleOrden() {
                 onChange={(e) => setPhotoData({...photoData, descripcion: e.target.value})}
               />
             </div>
-            <div className="relative">
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handlePhotoCapture}
-                className="absolute inset-0 opacity-0 cursor-pointer"
+            <div className="space-y-2">
+              <Button
+                className="w-full h-12 relative overflow-hidden"
                 disabled={uploadingPhoto}
-              />
-              <Button className="w-full h-12" disabled={uploadingPhoto}>
+              >
+                <input
+                  type="file"
+                  accept="image/*,.heic,.heif"
+                  capture="environment"
+                  onChange={handlePhotoCapture}
+                  className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                  disabled={uploadingPhoto}
+                />
                 {uploadingPhoto ? (
                   <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                 ) : (
                   <Camera className="h-5 w-5 mr-2" />
                 )}
-                {uploadingPhoto ? 'Subiendo...' : 'Capturar Foto'}
+                {uploadingPhoto ? 'Subiendo...' : 'Tomar Foto'}
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full h-12 relative overflow-hidden"
+                disabled={uploadingPhoto}
+              >
+                <input
+                  type="file"
+                  accept="image/*,.heic,.heif"
+                  onChange={handlePhotoCapture}
+                  className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                  disabled={uploadingPhoto}
+                />
+                {uploadingPhoto ? (
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                ) : (
+                  <FileText className="h-5 w-5 mr-2" />
+                )}
+                {uploadingPhoto ? 'Subiendo...' : 'Elegir de Galería'}
               </Button>
             </div>
           </div>
