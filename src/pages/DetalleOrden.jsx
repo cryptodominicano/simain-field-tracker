@@ -33,6 +33,62 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+// Compress image for mobile upload
+const compressImage = async (file, maxSizeMB = 1, maxWidthOrHeight = 1920) => {
+  return new Promise((resolve) => {
+    // If file is already small enough, return as-is
+    if (file.size <= maxSizeMB * 1024 * 1024) {
+      resolve(file);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+
+        // Scale down if needed
+        if (width > maxWidthOrHeight || height > maxWidthOrHeight) {
+          if (width > height) {
+            height = (height / width) * maxWidthOrHeight;
+            width = maxWidthOrHeight;
+          } else {
+            width = (width / height) * maxWidthOrHeight;
+            height = maxWidthOrHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now()
+              });
+              resolve(compressedFile);
+            } else {
+              resolve(file); // Fallback to original
+            }
+          },
+          'image/jpeg',
+          0.8 // 80% quality
+        );
+      };
+      img.onerror = () => resolve(file); // Fallback to original
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve(file); // Fallback to original
+    reader.readAsDataURL(file);
+  });
+};
+
 export default function DetalleOrden() {
   const urlParams = new URLSearchParams(window.location.search);
   const ordenId = urlParams.get('id');
@@ -157,11 +213,11 @@ export default function DetalleOrden() {
       return;
     }
 
-    const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+    const originalSizeMB = (file.size / (1024 * 1024)).toFixed(2);
     console.log('[PHOTO] File selected:', { name: file.name, type: file.type, size: file.size });
 
     setUploadingPhoto(true);
-    setUploadStatus(`1. Archivo: ${file.name} (${fileSizeMB}MB)`);
+    setUploadStatus(`1. Archivo: ${file.name} (${originalSizeMB}MB)`);
 
     try {
       // Validate file type on mobile (some browsers return empty type)
@@ -179,11 +235,18 @@ export default function DetalleOrden() {
         };
         const mimeType = mimeTypes[ext] || 'image/jpeg';
         fileToUpload = new File([file], file.name, { type: mimeType });
-        setUploadStatus(`1. Archivo: ${file.name} (${fileSizeMB}MB) tipo: ${mimeType}`);
+      }
+
+      // Compress image if larger than 1MB
+      if (fileToUpload.size > 1024 * 1024) {
+        setUploadStatus(prev => prev + '\n2. Comprimiendo imagen...');
+        fileToUpload = await compressImage(fileToUpload, 1, 1920);
+        const compressedSizeMB = (fileToUpload.size / (1024 * 1024)).toFixed(2);
+        setUploadStatus(prev => prev.replace('Comprimiendo imagen...', `Comprimido: ${originalSizeMB}MB → ${compressedSizeMB}MB`));
       }
 
       // Get current location (non-blocking with strict timeout)
-      setUploadStatus(prev => prev + '\n2. Obteniendo GPS...');
+      setUploadStatus(prev => prev + '\n3. Obteniendo GPS...');
       let lat, lon;
       try {
         const position = await Promise.race([
@@ -198,18 +261,41 @@ export default function DetalleOrden() {
         ]);
         lat = position.coords.latitude;
         lon = position.coords.longitude;
-        setUploadStatus(prev => prev.replace('Obteniendo GPS...', `GPS OK (${lat.toFixed(4)}, ${lon.toFixed(4)})`));
+        setUploadStatus(prev => prev.replace('Obteniendo GPS...', `GPS OK`));
       } catch (locError) {
         setUploadStatus(prev => prev.replace('Obteniendo GPS...', 'GPS omitido'));
       }
 
-      // Upload file
-      setUploadStatus(prev => prev + '\n3. Subiendo a Supabase...');
-      const { file_url } = await integrations.Core.UploadFile({ file: fileToUpload });
-      setUploadStatus(prev => prev.replace('Subiendo a Supabase...', 'Subido OK'));
+      // Upload file with retry logic
+      setUploadStatus(prev => prev + '\n4. Subiendo a Supabase...');
+      let file_url = null;
+      let uploadError = null;
+
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          if (attempt > 1) {
+            setUploadStatus(prev => prev.replace(/Subiendo.*/, `Subiendo (intento ${attempt}/3)...`));
+          }
+          const result = await integrations.Core.UploadFile({ file: fileToUpload });
+          file_url = result.file_url;
+          break; // Success, exit retry loop
+        } catch (err) {
+          uploadError = err;
+          if (attempt < 3) {
+            // Wait before retry (1s, then 2s)
+            await new Promise(r => setTimeout(r, attempt * 1000));
+          }
+        }
+      }
+
+      if (!file_url) {
+        throw uploadError || new Error('Error al subir archivo después de 3 intentos');
+      }
+
+      setUploadStatus(prev => prev.replace(/Subiendo.*/, 'Subido OK'));
 
       // Save photo record
-      setUploadStatus(prev => prev + '\n4. Guardando registro...');
+      setUploadStatus(prev => prev + '\n5. Guardando registro...');
       await entities.fotos.create({
         orden_trabajo_id: ordenId,
         numero_orden: orden.numero_orden,
@@ -222,12 +308,14 @@ export default function DetalleOrden() {
         longitud: lon
       });
 
-      setUploadStatus('¡Completado!');
+      setUploadStatus('✓ ¡Completado!');
       toast.success('Foto subida exitosamente');
       queryClient.invalidateQueries(['fotos-orden', ordenId]);
-      setShowPhotoDialog(false);
-      setPhotoData({ tipo_foto: 'Durante', descripcion: '' });
-      setUploadStatus('');
+      setTimeout(() => {
+        setShowPhotoDialog(false);
+        setPhotoData({ tipo_foto: 'Durante', descripcion: '' });
+        setUploadStatus('');
+      }, 1000);
     } catch (error) {
       console.error('Photo upload error:', error);
       setUploadStatus(prev => prev + `\n❌ ERROR: ${error.message || 'Error desconocido'}`);

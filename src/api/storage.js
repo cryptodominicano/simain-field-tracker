@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 
 const BUCKET_NAME = 'photos';
-const UPLOAD_TIMEOUT_MS = 60000; // 60 seconds for mobile uploads
+const UPLOAD_TIMEOUT_MS = 90000; // 90 seconds for slow mobile networks
 const MAX_FILE_SIZE_MB = 10; // 10MB max file size
 
 /**
