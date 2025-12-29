@@ -95,27 +95,49 @@ Updated DetalleOrden.jsx:
 - Split into two buttons: "Tomar Foto" (camera) and "Elegir de Galeria" (gallery)
 - Reset file input after upload to allow re-selection
 
-### Next Steps to Debug
-1. Test on mobile with browser dev tools connected:
-   - iOS: Safari Web Inspector via Mac
-   - Android: chrome://inspect on desktop Chrome
+### Current Test (Dec 29, 2024)
+**Observation**: Screenshot shows "Subiendo..." on BOTH the button AND below it - upload starts but hangs.
 
-2. Check console logs on mobile for:
-   - "File selected:" - confirms file was picked
-   - "Starting upload..." - confirms upload began
-   - Any error messages
+#### 5. Enhanced Logging (DEPLOYED)
+Added detailed `[PHOTO]` and `[STORAGE]` prefixed console logs to trace exactly where hang occurs:
+- `[PHOTO] File selected:` - file picked from gallery/camera
+- `[PHOTO] Getting GPS location...` - starting GPS (now has 3s timeout)
+- `[PHOTO] GPS obtained/skipped:` - GPS result
+- `[PHOTO] Starting Supabase upload...` - calling storage API
+- `[STORAGE] uploadFile called with:` - storage.js received call
+- `[STORAGE] Getting current user...` - auth check
+- `[STORAGE] Auth result:` - auth complete
+- `[STORAGE] Starting upload to bucket:` - actual upload starting
+- `[STORAGE] Upload promise created, waiting for result...` - waiting for Supabase
+- `[STORAGE] Promise.race resolved` - upload completed OR timeout
+- `[STORAGE] Upload result:` - success or error details
+- `[PHOTO] Upload successful:` - back in UI code
 
-3. If no console output after file selection:
-   - The file input onChange may not be firing
-   - Try different file input configurations
+#### GPS Fix Applied
+- Reduced timeout from 5s to 3s with Promise.race backup
+- Set `enableHighAccuracy: false` for faster mobile response
+- Added `maximumAge: 60000` to accept cached location
 
-4. Possible remaining issues:
-   - Mobile browser blocking cross-origin requests
-   - File too large for mobile network
-   - CORS issues with Supabase storage
-   - Mobile Safari specific quirks
+### Next: Mobile Console Test
+Need to check mobile browser console to see which log message is LAST before hang:
+- If stuck at `[PHOTO] Getting GPS location...` → GPS issue (should be fixed now)
+- If stuck at `[STORAGE] Getting current user...` → Auth deadlock (noOpLock issue)
+- If stuck at `[STORAGE] Upload promise created...` → Supabase network/CORS issue
+- If stuck at `[STORAGE] Promise.race resolved` → Upload succeeded but photo record failed
 
-### Console Messages to Look For
+### How to Check Mobile Console
+**Android**:
+1. Enable USB debugging on phone
+2. Connect to computer with USB
+3. Open `chrome://inspect` in desktop Chrome
+4. Find device and click "inspect"
+
+**iOS**:
+1. Connect iPhone to Mac with USB
+2. Enable Web Inspector in Safari settings on phone
+3. Open Safari on Mac → Develop menu → Select device
+
+### Previous Console Messages (Old Format)
 ```
 File selected: {name, type, size, lastModified}
 File type empty, using: image/jpeg  (if type was missing)
@@ -123,14 +145,6 @@ Starting upload...
 Starting upload to bucket: photos file: <path>
 Upload result: {data, error}
 Upload successful: <url>
-```
-
-Or errors:
-```
-Upload race error: <error>
-Supabase storage error: <error>
-Photo upload error: <error>
-Processing upload error: {message, statusCode, error}
 ```
 
 ## Recent Changes (Dec 2024)
