@@ -150,42 +150,46 @@ export default function Layout({ children, currentPageName }) {
         // Mobile Technician Layout
         <div className={cn("flex flex-col min-h-screen", !isOnline && "pt-10")}>
           {/* Mobile Header */}
-          <header className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 py-3">
-            <div className="flex items-center justify-between">
-              <Link to={createPageUrl('Perfil')} className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold overflow-hidden">
-                  {userProfile?.foto_perfil ? (
-                    <img src={userProfile.foto_perfil} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    userProfile?.nombre_completo?.charAt(0) || 'S'
-                  )}
-                </div>
-                <div className="text-left">
-                  <p className="text-sm text-gray-500">Hola,</p>
-                  <p className="font-semibold text-gray-900">{userProfile?.nombre_completo?.split(' ')[0] || 'Técnico'}</p>
-                </div>
-              </Link>
-              <Link to={createPageUrl('Notificaciones')}>
-                <Button variant="ghost" size="icon" className="relative">
-                  <Bell className="h-5 w-5 text-gray-600" />
-                  {notifications.length > 0 && (
-                    <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
-                      {notifications.length}
-                    </span>
-                  )}
-                </Button>
-              </Link>
+          <header className="sticky top-0 z-40 bg-white border-b border-gray-200">
+            <div className="max-w-3xl mx-auto px-4 py-3">
+              <div className="flex items-center justify-between">
+                <Link to={createPageUrl('Perfil')} className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold overflow-hidden">
+                    {userProfile?.foto_perfil ? (
+                      <img src={userProfile.foto_perfil} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      userProfile?.nombre_completo?.charAt(0) || 'S'
+                    )}
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm text-gray-500">Hola,</p>
+                    <p className="font-semibold text-gray-900">{userProfile?.nombre_completo?.split(' ')[0] || 'Técnico'}</p>
+                  </div>
+                </Link>
+                <Link to={createPageUrl('Notificaciones')}>
+                  <Button variant="ghost" size="icon" className="relative">
+                    <Bell className="h-5 w-5 text-gray-600" />
+                    {notifications.length > 0 && (
+                      <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
+                        {notifications.length}
+                      </span>
+                    )}
+                  </Button>
+                </Link>
+              </div>
             </div>
           </header>
 
           {/* Main Content */}
           <main className="flex-1 pb-20">
-            {children}
+            <div className="max-w-3xl mx-auto">
+              {children}
+            </div>
           </main>
 
           {/* Bottom Navigation */}
           <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
-            <div className="flex justify-around py-2">
+            <div className="max-w-3xl mx-auto flex justify-around py-2">
               {tecnicoNav.map((item) => {
                 const isActive = currentPageName === item.page;
                 return (

@@ -82,9 +82,15 @@ export function AuthProvider({ children }) {
   };
 
   const signOut = async () => {
-    await auth.signOut();
-    setUser(null);
-    setUserProfile(null);
+    try {
+      await auth.signOut();
+    } catch (error) {
+      console.error('Sign out error:', error);
+    } finally {
+      // Always clear local state even if API call fails
+      setUser(null);
+      setUserProfile(null);
+    }
   };
 
   const value = {
