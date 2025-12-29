@@ -95,56 +95,38 @@ Updated DetalleOrden.jsx:
 - Split into two buttons: "Tomar Foto" (camera) and "Elegir de Galeria" (gallery)
 - Reset file input after upload to allow re-selection
 
-### Current Test (Dec 29, 2024)
-**Observation**: Screenshot shows "Subiendo..." on BOTH the button AND below it - upload starts but hangs.
+### Mobile Upload Issue - RESOLVED (Dec 29, 2024)
 
-#### 5. Enhanced Logging (DEPLOYED)
-Added detailed `[PHOTO]` and `[STORAGE]` prefixed console logs to trace exactly where hang occurs:
-- `[PHOTO] File selected:` - file picked from gallery/camera
-- `[PHOTO] Getting GPS location...` - starting GPS (now has 3s timeout)
-- `[PHOTO] GPS obtained/skipped:` - GPS result
-- `[PHOTO] Starting Supabase upload...` - calling storage API
-- `[STORAGE] uploadFile called with:` - storage.js received call
-- `[STORAGE] Getting current user...` - auth check
-- `[STORAGE] Auth result:` - auth complete
-- `[STORAGE] Starting upload to bucket:` - actual upload starting
-- `[STORAGE] Upload promise created, waiting for result...` - waiting for Supabase
-- `[STORAGE] Promise.race resolved` - upload completed OR timeout
-- `[STORAGE] Upload result:` - success or error details
-- `[PHOTO] Upload successful:` - back in UI code
+#### Root Cause Identified
+Using on-screen debug status, we found the real errors:
+- "La carga tardó demasiado" = **Timeout** (60s wasn't enough for 3MB+ files on LTE)
+- "Error al subir archivo: Load failed" = **Network fetch failed** (connection dropped)
 
-#### GPS Fix Applied
-- Reduced timeout from 5s to 3s with Promise.race backup
-- Set `enableHighAccuracy: false` for faster mobile response
-- Added `maximumAge: 60000` to accept cached location
+**Some uploads worked** - confirming auth and storage policies are correct. The issue was large file sizes (3-4MB) on unreliable mobile networks.
 
-### Next: Mobile Console Test
-Need to check mobile browser console to see which log message is LAST before hang:
-- If stuck at `[PHOTO] Getting GPS location...` → GPS issue (should be fixed now)
-- If stuck at `[STORAGE] Getting current user...` → Auth deadlock (noOpLock issue)
-- If stuck at `[STORAGE] Upload promise created...` → Supabase network/CORS issue
-- If stuck at `[STORAGE] Promise.race resolved` → Upload succeeded but photo record failed
+#### 6. Image Compression (DEPLOYED)
+Added automatic compression for images >1MB:
+- Uses Canvas API to resize/compress
+- Max dimensions: 1920px on longest side
+- JPEG quality: 80%
+- Typical result: 3.11MB → ~0.85MB
 
-### How to Check Mobile Console
-**Android**:
-1. Enable USB debugging on phone
-2. Connect to computer with USB
-3. Open `chrome://inspect` in desktop Chrome
-4. Find device and click "inspect"
+#### 7. Retry Logic (DEPLOYED)
+- 3 automatic retry attempts for failed uploads
+- Delays: 1s after first fail, 2s after second
+- Shows "Subiendo (intento 2/3)..." in status
 
-**iOS**:
-1. Connect iPhone to Mac with USB
-2. Enable Web Inspector in Safari settings on phone
-3. Open Safari on Mac → Develop menu → Select device
+#### 8. Increased Timeout (DEPLOYED)
+- Timeout increased from 60s to 90s for slow networks
 
-### Previous Console Messages (Old Format)
+### Upload Flow (Current)
 ```
-File selected: {name, type, size, lastModified}
-File type empty, using: image/jpeg  (if type was missing)
-Starting upload...
-Starting upload to bucket: photos file: <path>
-Upload result: {data, error}
-Upload successful: <url>
+1. Archivo: image.jpg (3.11MB)
+2. Comprimido: 3.11MB → 0.85MB
+3. GPS OK / GPS omitido
+4. Subiendo a Supabase... / Subiendo (intento 2/3)...
+5. Guardando registro...
+✓ ¡Completado!
 ```
 
 ## Recent Changes (Dec 2024)
