@@ -76,7 +76,8 @@ export default function Perfil() {
       toast.success('Foto actualizada');
       refreshProfile();
     } catch (error) {
-      toast.error('Error al subir la foto');
+      console.error('Profile photo upload error:', error);
+      toast.error(error.message || 'Error al subir la foto');
     } finally {
       setUploadingPhoto(false);
     }

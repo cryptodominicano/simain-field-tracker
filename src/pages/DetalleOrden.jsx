@@ -189,7 +189,8 @@ export default function DetalleOrden() {
       setShowPhotoDialog(false);
       setPhotoData({ tipo_foto: 'Durante', descripcion: '' });
     } catch (error) {
-      toast.error('Error al subir la foto');
+      console.error('Photo upload error:', error);
+      toast.error(error.message || 'Error al subir la foto');
     } finally {
       setUploadingPhoto(false);
     }
