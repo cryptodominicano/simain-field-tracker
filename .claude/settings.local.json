@@ -4,7 +4,13 @@
       "Bash(find:*)",
       "Bash(grep:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nInitial commit: SIMAIN Field Tracker - Migrated to Supabase\n\n- Complete migration from Base44 SDK to Supabase\n- Supabase Auth with email/password authentication\n- 7 database tables with RLS policies (schema.sql)\n- File storage integration for photos\n- 17 page components for field service management\n- React 18 + Vite + TailwindCSS + Radix UI\n- Vercel deployment configuration\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm install:*)"
     ]
   }
 }
