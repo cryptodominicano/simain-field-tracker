@@ -82,9 +82,19 @@ export default function Perfil() {
     }
   };
 
+  const [loggingOut, setLoggingOut] = useState(false);
+
   const handleLogout = async () => {
-    await signOut();
-    navigate('/login');
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await signOut();
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force redirect even on error
+      window.location.href = '/login';
+    }
   };
 
   const getRolLabel = (rol) => {
@@ -109,13 +119,18 @@ export default function Perfil() {
         </div>
         <Skeleton className="h-40" />
         <Skeleton className="h-32" />
-        <Button 
+        <Button
           variant="outline"
           className="w-full h-12 text-red-600 border-red-200 hover:bg-red-50 mt-6"
           onClick={handleLogout}
+          disabled={loggingOut}
         >
-          <LogOut className="h-5 w-5 mr-2" />
-          Cerrar Sesión
+          {loggingOut ? (
+            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+          ) : (
+            <LogOut className="h-5 w-5 mr-2" />
+          )}
+          {loggingOut ? 'Cerrando...' : 'Cerrar Sesión'}
         </Button>
       </div>
     );
@@ -238,13 +253,18 @@ export default function Perfil() {
       )}
 
       {/* Logout Button */}
-      <Button 
+      <Button
         variant="outline"
         className="w-full h-12 text-red-600 border-red-200 hover:bg-red-50"
         onClick={handleLogout}
+        disabled={loggingOut}
       >
-        <LogOut className="h-5 w-5 mr-2" />
-        Cerrar Sesión
+        {loggingOut ? (
+          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+        ) : (
+          <LogOut className="h-5 w-5 mr-2" />
+        )}
+        {loggingOut ? 'Cerrando...' : 'Cerrar Sesión'}
       </Button>
 
       {/* Edit Dialog */}

@@ -11,18 +11,28 @@ export function AuthProvider({ children }) {
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    // Get initial session
+    // Get initial session with timeout
     const initAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
+      // Set a timeout to prevent infinite loading
+      const timeout = setTimeout(() => {
+        console.warn('Auth initialization timeout - proceeding without session');
+        setLoading(false);
+        setInitialized(true);
+      }, 5000);
 
-        if (session?.user) {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error('Auth session error:', error);
+        } else if (session?.user) {
           setUser(session.user);
           await loadUserProfile(session.user.id);
         }
       } catch (error) {
         console.error('Auth init error:', error);
       } finally {
+        clearTimeout(timeout);
         setLoading(false);
         setInitialized(true);
       }
