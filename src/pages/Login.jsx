@@ -66,11 +66,11 @@ export default function Login() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-4">
           <img
             src="/signon-logo.png"
             alt="SIMAIN SRL - Servicios de Ingeniería y Mantenimiento Industrial"
-            className="h-48 mx-auto mb-4"
+            className="h-48 mx-auto"
           />
           <p className="text-gray-500 mt-1">Rastreador de Servicio de Campo</p>
         </div>
