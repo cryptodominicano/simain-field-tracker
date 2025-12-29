@@ -43,14 +43,28 @@ const getUploadErrorMessage = (error) => {
   if (!error) return 'Error desconocido al subir el archivo.';
 
   const message = error.message || error.toString();
+  const statusCode = error.statusCode || error.status;
 
-  if (message.includes('network') || message.includes('fetch')) {
+  console.log('Processing upload error:', { message, statusCode, error });
+
+  // Check status codes first
+  if (statusCode === 403 || message.includes('403')) {
+    return 'No tienes permiso para subir archivos. El bucket de almacenamiento puede no estar configurado correctamente.';
+  }
+  if (statusCode === 404 || message.includes('404') || message.includes('not found')) {
+    return 'El bucket de almacenamiento "photos" no existe. Contacta al administrador.';
+  }
+  if (statusCode === 401 || message.includes('401')) {
+    return 'Sesión expirada. Por favor, cierra sesión y vuelve a entrar.';
+  }
+
+  if (message.includes('network') || message.includes('fetch') || message.includes('Failed to fetch')) {
     return 'Error de conexión. Verifica tu internet e intenta de nuevo.';
   }
-  if (message.includes('storage/unauthorized') || message.includes('not authorized')) {
+  if (message.includes('storage/unauthorized') || message.includes('not authorized') || message.includes('Unauthorized')) {
     return 'No tienes permiso para subir archivos. Intenta cerrar sesión y volver a entrar.';
   }
-  if (message.includes('storage/quota')) {
+  if (message.includes('storage/quota') || message.includes('quota')) {
     return 'Se ha excedido el límite de almacenamiento.';
   }
   if (message.includes('duplicate') || message.includes('already exists')) {
@@ -58,6 +72,12 @@ const getUploadErrorMessage = (error) => {
   }
   if (message.includes('timeout') || message.includes('tardó')) {
     return message;
+  }
+  if (message.includes('policy') || message.includes('RLS')) {
+    return 'Error de permisos en el bucket. Las políticas de almacenamiento no permiten esta operación.';
+  }
+  if (message.includes('Bucket not found')) {
+    return 'El bucket de almacenamiento "photos" no existe. Contacta al administrador.';
   }
 
   return `Error al subir archivo: ${message}`;
@@ -89,6 +109,8 @@ export const storage = {
       const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
       // Upload file with timeout
+      console.log('Starting upload to bucket:', BUCKET_NAME, 'file:', fileName);
+
       const uploadPromise = supabase.storage
         .from(BUCKET_NAME)
         .upload(fileName, file, {
@@ -96,12 +118,23 @@ export const storage = {
           upsert: false
         });
 
-      const { data, error } = await Promise.race([
-        uploadPromise,
-        createUploadTimeout(UPLOAD_TIMEOUT_MS)
-      ]);
+      let result;
+      try {
+        result = await Promise.race([
+          uploadPromise,
+          createUploadTimeout(UPLOAD_TIMEOUT_MS)
+        ]);
+      } catch (raceError) {
+        console.error('Upload race error:', raceError);
+        throw raceError;
+      }
+
+      const { data, error } = result;
+
+      console.log('Upload result:', { data, error });
 
       if (error) {
+        console.error('Supabase storage error:', error);
         throw new Error(getUploadErrorMessage(error));
       }
 
