@@ -156,7 +156,7 @@ export default function DetalleOrden() {
       return;
     }
 
-    console.log('File selected:', {
+    console.log('[PHOTO] File selected:', {
       name: file.name,
       type: file.type,
       size: file.size,
@@ -181,26 +181,35 @@ export default function DetalleOrden() {
           'heif': 'image/heif'
         };
         const mimeType = mimeTypes[ext] || 'image/jpeg';
-        console.log('File type empty, using:', mimeType);
+        console.log('[PHOTO] File type empty, using:', mimeType);
         fileToUpload = new File([file], file.name, { type: mimeType });
       }
 
-      // Get current location
+      // Get current location (non-blocking with strict timeout)
       let lat, lon;
+      console.log('[PHOTO] Getting GPS location...');
       try {
-        const position = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
-        });
+        const position = await Promise.race([
+          new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: false,
+              timeout: 3000,
+              maximumAge: 60000
+            });
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('GPS timeout')), 3000))
+        ]);
         lat = position.coords.latitude;
         lon = position.coords.longitude;
+        console.log('[PHOTO] GPS obtained:', lat, lon);
       } catch (locError) {
-        console.log('Could not get location:', locError);
+        console.log('[PHOTO] GPS skipped:', locError.message || locError);
       }
 
-      console.log('Starting upload...');
+      console.log('[PHOTO] Starting Supabase upload...');
       // Upload file
       const { file_url } = await integrations.Core.UploadFile({ file: fileToUpload });
-      console.log('Upload successful:', file_url);
+      console.log('[PHOTO] Upload successful:', file_url);
 
       // Save photo record
       await entities.fotos.create({

@@ -96,11 +96,17 @@ export const storage = {
    */
   async uploadFile({ file, onProgress }) {
     try {
+      console.log('[STORAGE] uploadFile called with:', { name: file.name, type: file.type, size: file.size });
+
       // Validate file
       validateFile(file);
+      console.log('[STORAGE] File validated');
 
       // Get current user for folder organization
+      console.log('[STORAGE] Getting current user...');
       const { data: { user }, error: authError } = await supabase.auth.getUser();
+      console.log('[STORAGE] Auth result:', { userId: user?.id, authError: authError?.message });
+
       if (authError) {
         throw new Error('Error de autenticación. Por favor, inicia sesión de nuevo.');
       }
@@ -113,7 +119,7 @@ export const storage = {
       const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
       // Upload file with timeout
-      console.log('Starting upload to bucket:', BUCKET_NAME, 'file:', fileName);
+      console.log('[STORAGE] Starting upload to bucket:', BUCKET_NAME, 'file:', fileName);
 
       const uploadPromise = supabase.storage
         .from(BUCKET_NAME)
@@ -122,20 +128,23 @@ export const storage = {
           upsert: false
         });
 
+      console.log('[STORAGE] Upload promise created, waiting for result...');
+
       let result;
       try {
         result = await Promise.race([
           uploadPromise,
           createUploadTimeout(UPLOAD_TIMEOUT_MS)
         ]);
+        console.log('[STORAGE] Promise.race resolved');
       } catch (raceError) {
-        console.error('Upload race error:', raceError);
+        console.error('[STORAGE] Upload race error:', raceError);
         throw raceError;
       }
 
       const { data, error } = result;
 
-      console.log('Upload result:', { data, error });
+      console.log('[STORAGE] Upload result:', { data, error: error?.message });
 
       if (error) {
         console.error('Supabase storage error:', error);
