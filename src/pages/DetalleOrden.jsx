@@ -44,6 +44,7 @@ export default function DetalleOrden() {
   const [pendingCheckIn, setPendingCheckIn] = useState(null);
   const [photoData, setPhotoData] = useState({ tipo_foto: 'Durante', descripcion: '' });
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState(''); // Debug status for mobile
   const [checkingIn, setCheckingIn] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
 
@@ -156,20 +157,16 @@ export default function DetalleOrden() {
       return;
     }
 
-    console.log('[PHOTO] File selected:', {
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      lastModified: file.lastModified
-    });
+    const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+    console.log('[PHOTO] File selected:', { name: file.name, type: file.type, size: file.size });
 
     setUploadingPhoto(true);
+    setUploadStatus(`1. Archivo: ${file.name} (${fileSizeMB}MB)`);
 
     try {
       // Validate file type on mobile (some browsers return empty type)
       let fileToUpload = file;
       if (!file.type || file.type === '') {
-        // Try to determine type from extension
         const ext = file.name.split('.').pop()?.toLowerCase();
         const mimeTypes = {
           'jpg': 'image/jpeg',
@@ -181,13 +178,13 @@ export default function DetalleOrden() {
           'heif': 'image/heif'
         };
         const mimeType = mimeTypes[ext] || 'image/jpeg';
-        console.log('[PHOTO] File type empty, using:', mimeType);
         fileToUpload = new File([file], file.name, { type: mimeType });
+        setUploadStatus(`1. Archivo: ${file.name} (${fileSizeMB}MB) tipo: ${mimeType}`);
       }
 
       // Get current location (non-blocking with strict timeout)
+      setUploadStatus(prev => prev + '\n2. Obteniendo GPS...');
       let lat, lon;
-      console.log('[PHOTO] Getting GPS location...');
       try {
         const position = await Promise.race([
           new Promise((resolve, reject) => {
@@ -201,17 +198,18 @@ export default function DetalleOrden() {
         ]);
         lat = position.coords.latitude;
         lon = position.coords.longitude;
-        console.log('[PHOTO] GPS obtained:', lat, lon);
+        setUploadStatus(prev => prev.replace('Obteniendo GPS...', `GPS OK (${lat.toFixed(4)}, ${lon.toFixed(4)})`));
       } catch (locError) {
-        console.log('[PHOTO] GPS skipped:', locError.message || locError);
+        setUploadStatus(prev => prev.replace('Obteniendo GPS...', 'GPS omitido'));
       }
 
-      console.log('[PHOTO] Starting Supabase upload...');
       // Upload file
+      setUploadStatus(prev => prev + '\n3. Subiendo a Supabase...');
       const { file_url } = await integrations.Core.UploadFile({ file: fileToUpload });
-      console.log('[PHOTO] Upload successful:', file_url);
+      setUploadStatus(prev => prev.replace('Subiendo a Supabase...', 'Subido OK'));
 
       // Save photo record
+      setUploadStatus(prev => prev + '\n4. Guardando registro...');
       await entities.fotos.create({
         orden_trabajo_id: ordenId,
         numero_orden: orden.numero_orden,
@@ -224,12 +222,15 @@ export default function DetalleOrden() {
         longitud: lon
       });
 
+      setUploadStatus('¡Completado!');
       toast.success('Foto subida exitosamente');
       queryClient.invalidateQueries(['fotos-orden', ordenId]);
       setShowPhotoDialog(false);
       setPhotoData({ tipo_foto: 'Durante', descripcion: '' });
+      setUploadStatus('');
     } catch (error) {
       console.error('Photo upload error:', error);
+      setUploadStatus(prev => prev + `\n❌ ERROR: ${error.message || 'Error desconocido'}`);
       toast.error(error.message || 'Error al subir la foto');
     } finally {
       setUploadingPhoto(false);
@@ -528,6 +529,12 @@ export default function DetalleOrden() {
                 {uploadingPhoto ? 'Subiendo...' : 'Elegir de Galería'}
               </Button>
             </div>
+            {/* Debug status display */}
+            {uploadStatus && (
+              <div className="mt-3 p-3 bg-gray-100 rounded-lg text-xs font-mono whitespace-pre-line">
+                {uploadStatus}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
