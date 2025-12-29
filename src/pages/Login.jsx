@@ -67,11 +67,12 @@ export default function Login() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-xl bg-blue-600 flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-2xl">S</span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">SIMAIN SRL</h1>
-          <p className="text-gray-500 mt-1">Field Service Tracker</p>
+          <img
+            src="/signon-logo.png"
+            alt="SIMAIN SRL - Servicios de Ingeniería y Mantenimiento Industrial"
+            className="h-24 mx-auto mb-4"
+          />
+          <p className="text-gray-500 mt-1">Rastreador de Servicio de Campo</p>
         </div>
 
         <Card className="bg-white shadow-lg">
