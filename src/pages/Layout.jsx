@@ -182,7 +182,7 @@ export default function Layout({ children, currentPageName }) {
 
           {/* Main Content */}
           <main className="flex-1 pb-20">
-            <div className="max-w-3xl mx-auto">
+            <div className="max-w-3xl mx-auto px-4">
               {children}
             </div>
           </main>
