@@ -70,7 +70,7 @@ export default function Login() {
           <img
             src="/signon-logo.png"
             alt="SIMAIN SRL - Servicios de Ingeniería y Mantenimiento Industrial"
-            className="h-24 mx-auto mb-4"
+            className="h-48 mx-auto mb-4"
           />
           <p className="text-gray-500 mt-1">Rastreador de Servicio de Campo</p>
         </div>
