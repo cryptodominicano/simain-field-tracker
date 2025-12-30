@@ -132,7 +132,7 @@ Added automatic compression for images >1MB:
 ```
 
 ## Recent Changes (Dec 2024)
-- **Offline photo queue** - Photos saved to localStorage when no signal, auto-sync when back online, auto-refresh UI after sync
+- **Offline queue for photos, check-ins, and reports** - All saved to localStorage when no signal, auto-sync when back online
 - Fixed DetalleOrden bottom padding (pb-56) so photos aren't hidden by action buttons
 - Fixed auth initialization timeout with noOpLock
 - Added robust file upload error handling with 60s timeout

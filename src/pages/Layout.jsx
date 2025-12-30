@@ -169,7 +169,7 @@ export default function Layout({ children, currentPageName }) {
                     <p className="font-semibold text-gray-900">{userProfile?.nombre_completo?.split(' ')[0] || 'Técnico'}</p>
                   </div>
                 </Link>
-                {/* Pending photos indicator */}
+                {/* Pending items indicator */}
                 {pendingCount > 0 && (
                   <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
                     {isSyncing ? (
@@ -177,7 +177,7 @@ export default function Layout({ children, currentPageName }) {
                     ) : (
                       <CloudOff className="h-3 w-3" />
                     )}
-                    <span>{pendingCount} foto{pendingCount > 1 ? 's' : ''}</span>
+                    <span>{pendingCount} pendiente{pendingCount > 1 ? 's' : ''}</span>
                   </div>
                 )}
                 <Link to={createPageUrl('Notificaciones')}>
@@ -312,7 +312,7 @@ export default function Layout({ children, currentPageName }) {
                 <div className="flex-1 lg:flex-none" />
                 
                 <div className="flex items-center gap-3">
-                  {/* Pending photos indicator */}
+                  {/* Pending items indicator */}
                   {pendingCount > 0 && (
                     <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
                       {isSyncing ? (
@@ -320,7 +320,7 @@ export default function Layout({ children, currentPageName }) {
                       ) : (
                         <CloudOff className="h-3 w-3" />
                       )}
-                      <span>{pendingCount} foto{pendingCount > 1 ? 's' : ''} pendiente{pendingCount > 1 ? 's' : ''}</span>
+                      <span>{pendingCount} pendiente{pendingCount > 1 ? 's' : ''}</span>
                     </div>
                   )}
                   <Link to={createPageUrl('Notificaciones')}>

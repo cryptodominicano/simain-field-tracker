@@ -4,6 +4,7 @@ import { entities } from '@/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { savePendingReport } from '@/utils/offlineQueue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,7 +65,7 @@ export default function CompletarReporte() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.descripcion_trabajo.trim()) {
       toast.error('Por favor describe el trabajo realizado');
       return;
@@ -72,41 +73,67 @@ export default function CompletarReporte() {
 
     setSubmitting(true);
 
+    // Get current location for check-out
+    let lat, lon, accuracy;
     try {
-      // Get current location for check-out
-      let lat, lon, accuracy;
-      try {
-        const position = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
-        });
-        lat = position.coords.latitude;
-        lon = position.coords.longitude;
-        accuracy = position.coords.accuracy;
-      } catch (e) {
-        console.log('Could not get location for check-out');
-      }
-
-      // Create work report
-      await entities.reportes_trabajo.create({
-        orden_trabajo_id: ordenId,
-        numero_orden: orden.numero_orden,
-        presentado_por_id: userProfile.id,
-        presentado_por_nombre: userProfile.nombre_completo,
-        ...formData,
-        estado_reporte: 'Enviado'
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
       });
+      lat = position.coords.latitude;
+      lon = position.coords.longitude;
+      accuracy = position.coords.accuracy;
+    } catch (e) {
+      console.log('Could not get location for check-out');
+    }
+
+    const reportData = {
+      orden_trabajo_id: ordenId,
+      numero_orden: orden.numero_orden,
+      presentado_por_id: userProfile.id,
+      presentado_por_nombre: userProfile.nombre_completo,
+      ...formData,
+      estado_reporte: 'Enviado'
+    };
+
+    const checkOutData = {
+      usuario_id: userProfile.id,
+      usuario_nombre: userProfile.nombre_completo,
+      orden_trabajo_id: ordenId,
+      numero_orden: orden.numero_orden,
+      tipo_registro: 'Fin',
+      latitud: lat || 0,
+      longitud: lon || 0,
+      precision_gps: accuracy || 0
+    };
+
+    // Check if offline
+    if (!navigator.onLine) {
+      try {
+        savePendingReport({
+          reportData,
+          checkOutData,
+          ordenId,
+          updateOrderStatus: true,
+          newStatus: 'Completada'
+        });
+        toast.success('Sin conexión - reporte guardado localmente', {
+          description: 'Se sincronizará cuando vuelvas a conectarte'
+        });
+        // Navigate back to dashboard
+        window.location.href = createPageUrl('DashboardTecnico');
+      } catch (error) {
+        toast.error('Error al guardar reporte offline');
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    try {
+      // Create work report
+      await entities.reportes_trabajo.create(reportData);
 
       // Create check-out registro
-      await entities.registros_entrada.create({
-        usuario_id: userProfile.id,
-        usuario_nombre: userProfile.nombre_completo,
-        orden_trabajo_id: ordenId,
-        numero_orden: orden.numero_orden,
-        tipo_registro: 'Fin',
-        latitud: lat || 0,
-        longitud: lon || 0,
-        precision_gps: accuracy || 0
-      });
+      await entities.registros_entrada.create(checkOutData);
 
       // Update order status
       await entities.ordenes_trabajo.update(ordenId, {
@@ -114,7 +141,7 @@ export default function CompletarReporte() {
       });
 
       toast.success('✓ Reporte enviado exitosamente');
-      
+
       // Navigate back to dashboard
       window.location.href = createPageUrl('DashboardTecnico');
     } catch (error) {

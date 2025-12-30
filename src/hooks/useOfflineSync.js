@@ -1,51 +1,56 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getPendingPhotos, getPendingCount, removePendingPhoto, pendingPhotoToFile } from '../utils/offlineQueue';
+import {
+  getPendingPhotos,
+  getPendingCheckIns,
+  getPendingReports,
+  getPendingCount,
+  getPendingCounts,
+  removePendingPhoto,
+  removePendingCheckIn,
+  removePendingReport,
+  pendingPhotoToFile
+} from '../utils/offlineQueue';
 import { integrations, entities } from '../api';
 import { toast } from 'sonner';
 
 /**
- * Hook to manage offline photo sync
- * - Monitors pending photo count
+ * Hook to manage offline sync for photos, check-ins, and work reports
+ * - Monitors pending counts across all queues
  * - Listens for online events
  * - Automatically syncs when back online
  */
 export function useOfflineSync() {
   const [pendingCount, setPendingCount] = useState(0);
+  const [pendingCounts, setPendingCounts] = useState({ photos: 0, checkIns: 0, reports: 0, total: 0 });
   const [isSyncing, setSyncing] = useState(false);
   const queryClient = useQueryClient();
 
-  // Update pending count
+  // Update pending counts
   const refreshCount = useCallback(() => {
-    setPendingCount(getPendingCount());
+    const counts = getPendingCounts();
+    setPendingCounts(counts);
+    setPendingCount(counts.total);
   }, []);
 
   // Sync all pending photos
-  const syncPendingPhotos = useCallback(async () => {
+  const syncPhotos = useCallback(async () => {
     const pending = getPendingPhotos();
-    if (pending.length === 0) return;
+    if (pending.length === 0) return { success: 0, fail: 0 };
 
-    setSyncing(true);
-    console.log('[SYNC] Starting sync of', pending.length, 'photos');
-
-    let successCount = 0;
-    let failCount = 0;
+    console.log('[SYNC] Syncing', pending.length, 'photos');
+    let success = 0, fail = 0;
 
     for (const pendingPhoto of pending) {
       try {
-        // Convert back to File
         const file = pendingPhotoToFile(pendingPhoto);
-
-        // Upload to Supabase
         const result = await integrations.Core.UploadFile({ file });
 
         if (result.offline) {
-          // Still offline, skip
-          console.log('[SYNC] Still offline, skipping', pendingPhoto.id);
+          console.log('[SYNC] Still offline, skipping photo', pendingPhoto.id);
           continue;
         }
 
-        // Save the photo record to database
         const metadata = pendingPhoto.metadata;
         if (metadata.orden_trabajo_id) {
           await entities.fotos.create({
@@ -61,34 +66,158 @@ export function useOfflineSync() {
           });
         }
 
-        // Remove from queue
         removePendingPhoto(pendingPhoto.id);
-        successCount++;
-        console.log('[SYNC] Successfully synced', pendingPhoto.id);
+        success++;
       } catch (error) {
-        console.error('[SYNC] Failed to sync', pendingPhoto.id, error);
-        failCount++;
+        console.error('[SYNC] Failed to sync photo', pendingPhoto.id, error);
+        fail++;
       }
     }
+
+    if (success > 0) {
+      queryClient.invalidateQueries({ queryKey: ['fotos-orden'] });
+    }
+
+    return { success, fail };
+  }, [queryClient]);
+
+  // Sync all pending check-ins
+  const syncCheckIns = useCallback(async () => {
+    const pending = getPendingCheckIns();
+    if (pending.length === 0) return { success: 0, fail: 0 };
+
+    console.log('[SYNC] Syncing', pending.length, 'check-ins');
+    let success = 0, fail = 0;
+
+    for (const pendingCheckIn of pending) {
+      try {
+        // Check if still offline
+        if (!navigator.onLine) {
+          console.log('[SYNC] Still offline, skipping check-in', pendingCheckIn.id);
+          continue;
+        }
+
+        const data = pendingCheckIn.data;
+
+        // Create the check-in record
+        await entities.registros_entrada.create(data.checkInData);
+
+        // Update order status if needed
+        if (data.updateOrderStatus) {
+          await entities.ordenes_trabajo.update(data.ordenId, {
+            estado: data.newStatus
+          });
+        }
+
+        removePendingCheckIn(pendingCheckIn.id);
+        success++;
+      } catch (error) {
+        console.error('[SYNC] Failed to sync check-in', pendingCheckIn.id, error);
+        fail++;
+      }
+    }
+
+    if (success > 0) {
+      queryClient.invalidateQueries({ queryKey: ['orden'] });
+    }
+
+    return { success, fail };
+  }, [queryClient]);
+
+  // Sync all pending work reports
+  const syncReports = useCallback(async () => {
+    const pending = getPendingReports();
+    if (pending.length === 0) return { success: 0, fail: 0 };
+
+    console.log('[SYNC] Syncing', pending.length, 'reports');
+    let success = 0, fail = 0;
+
+    for (const pendingReport of pending) {
+      try {
+        // Check if still offline
+        if (!navigator.onLine) {
+          console.log('[SYNC] Still offline, skipping report', pendingReport.id);
+          continue;
+        }
+
+        const data = pendingReport.data;
+
+        // Create the report record
+        await entities.reportes_trabajo.create(data.reportData);
+
+        // Update order status if needed
+        if (data.updateOrderStatus) {
+          await entities.ordenes_trabajo.update(data.ordenId, {
+            estado: data.newStatus
+          });
+        }
+
+        // Create checkout record if provided
+        if (data.checkOutData) {
+          await entities.registros_entrada.create(data.checkOutData);
+        }
+
+        removePendingReport(pendingReport.id);
+        success++;
+      } catch (error) {
+        console.error('[SYNC] Failed to sync report', pendingReport.id, error);
+        fail++;
+      }
+    }
+
+    if (success > 0) {
+      queryClient.invalidateQueries({ queryKey: ['orden'] });
+      queryClient.invalidateQueries({ queryKey: ['reportes'] });
+    }
+
+    return { success, fail };
+  }, [queryClient]);
+
+  // Sync all pending items
+  const syncAll = useCallback(async () => {
+    if (!navigator.onLine) {
+      console.log('[SYNC] Cannot sync - still offline');
+      return;
+    }
+
+    const totalPending = getPendingCount();
+    if (totalPending === 0) return;
+
+    setSyncing(true);
+    console.log('[SYNC] Starting sync of', totalPending, 'items');
+
+    // Sync all types
+    const [photoResults, checkInResults, reportResults] = await Promise.all([
+      syncPhotos(),
+      syncCheckIns(),
+      syncReports()
+    ]);
 
     setSyncing(false);
     refreshCount();
 
-    if (successCount > 0) {
-      // Invalidate photo queries to refresh the UI
-      queryClient.invalidateQueries({ queryKey: ['fotos-orden'] });
-      toast.success(`${successCount} foto${successCount > 1 ? 's' : ''} sincronizada${successCount > 1 ? 's' : ''}`);
+    // Show consolidated toast
+    const totalSuccess = photoResults.success + checkInResults.success + reportResults.success;
+    const totalFail = photoResults.fail + checkInResults.fail + reportResults.fail;
+
+    if (totalSuccess > 0) {
+      const parts = [];
+      if (photoResults.success > 0) parts.push(`${photoResults.success} foto${photoResults.success > 1 ? 's' : ''}`);
+      if (checkInResults.success > 0) parts.push(`${checkInResults.success} registro${checkInResults.success > 1 ? 's' : ''}`);
+      if (reportResults.success > 0) parts.push(`${reportResults.success} reporte${reportResults.success > 1 ? 's' : ''}`);
+      toast.success(`Sincronizado: ${parts.join(', ')}`);
     }
-    if (failCount > 0) {
-      toast.error(`${failCount} foto${failCount > 1 ? 's' : ''} no se pudo${failCount > 1 ? 'ieron' : ''} sincronizar`);
+
+    if (totalFail > 0) {
+      toast.error(`${totalFail} elemento${totalFail > 1 ? 's' : ''} no se pudo sincronizar`);
     }
-  }, [refreshCount, queryClient]);
+  }, [syncPhotos, syncCheckIns, syncReports, refreshCount]);
 
   // Listen for online events
   useEffect(() => {
     const handleOnline = () => {
       console.log('[SYNC] Back online, starting sync...');
-      syncPendingPhotos();
+      syncAll();
     };
 
     window.addEventListener('online', handleOnline);
@@ -96,22 +225,22 @@ export function useOfflineSync() {
     // Initial count
     refreshCount();
 
-    // If already online and have pending photos, sync them
+    // If already online and have pending items, sync them
     if (navigator.onLine && getPendingCount() > 0) {
-      syncPendingPhotos();
+      syncAll();
     }
 
     return () => {
       window.removeEventListener('online', handleOnline);
     };
-  }, [syncPendingPhotos, refreshCount]);
+  }, [syncAll, refreshCount]);
 
-  // Expose manual refresh for when photos are added
   return {
     pendingCount,
+    pendingCounts,
     isSyncing,
     refreshCount,
-    syncPendingPhotos
+    syncAll
   };
 }
 

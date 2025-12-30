@@ -4,6 +4,7 @@ import { entities, integrations } from '@/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { savePendingCheckIn } from '@/utils/offlineQueue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -179,16 +180,40 @@ export default function DetalleOrden() {
   };
 
   const performCheckIn = async (checkInData) => {
+    const checkInRecord = {
+      usuario_id: userProfile.id,
+      usuario_nombre: userProfile.nombre_completo,
+      orden_trabajo_id: ordenId,
+      numero_orden: orden.numero_orden,
+      tipo_registro: 'Inicio',
+      ...checkInData
+    };
+
+    // Check if offline
+    if (!navigator.onLine) {
+      try {
+        savePendingCheckIn({
+          checkInData: checkInRecord,
+          ordenId,
+          updateOrderStatus: true,
+          newStatus: 'En Progreso'
+        });
+        toast.success('Sin conexión - registro guardado localmente', {
+          description: 'Se sincronizará cuando vuelvas a conectarte'
+        });
+        setShowDistanceWarning(false);
+        setPendingCheckIn(null);
+      } catch (error) {
+        toast.error('Error al guardar registro offline');
+      } finally {
+        setCheckingIn(false);
+      }
+      return;
+    }
+
     try {
       // Create registro entrada
-      await entities.registros_entrada.create({
-        usuario_id: userProfile.id,
-        usuario_nombre: userProfile.nombre_completo,
-        orden_trabajo_id: ordenId,
-        numero_orden: orden.numero_orden,
-        tipo_registro: 'Inicio',
-        ...checkInData
-      });
+      await entities.registros_entrada.create(checkInRecord);
 
       // Update order status
       await entities.ordenes_trabajo.update(ordenId, {
