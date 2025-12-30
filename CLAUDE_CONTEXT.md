@@ -21,10 +21,11 @@ Storage: "photos" bucket (public = true)
 - src/api/storage.js - File uploads with timeout, error handling & offline queue
 - src/api/auth.js - Authentication
 - src/contexts/AuthContext.jsx - Auth state
-- src/pages/DetalleOrden.jsx - Order detail with photo upload
+- src/pages/DetalleOrden.jsx - Order detail with photo upload & check-in
+- src/pages/CompletarReporte.jsx - Work report submission
 - src/pages/Layout.jsx - Main layout component
-- src/utils/offlineQueue.js - Offline photo queue (localStorage)
-- src/hooks/useOfflineSync.js - Auto-sync when back online
+- src/utils/offlineQueue.js - Offline queues for photos, check-ins, and reports
+- src/hooks/useOfflineSync.js - Auto-sync all queues when back online
 - supabase/schema.sql - DB schema
 
 ## Current Task
