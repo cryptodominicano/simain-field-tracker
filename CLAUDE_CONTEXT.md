@@ -26,7 +26,10 @@ Storage: "photos" bucket (public = true)
 - src/pages/Layout.jsx - Main layout component
 - src/utils/offlineQueue.js - Offline queues for photos, check-ins, and reports
 - src/hooks/useOfflineSync.js - Auto-sync all queues when back online
+- src/config/branding.js - White-label configuration (company, colors, service types)
 - supabase/schema.sql - DB schema
+- supabase/reset_client.sql - Reset database for new client
+- docs/NEW_CLIENT_SETUP.md - New client setup checklist
 
 ## Current Task
 None - ready for new work
@@ -133,6 +136,9 @@ Added automatic compression for images >1MB:
 ```
 
 ## Recent Changes (Dec 2024)
+- **White-label configuration** - src/config/branding.js for easy multi-client deployment
+- **New client setup docs** - docs/NEW_CLIENT_SETUP.md with full checklist
+- **Database reset script** - supabase/reset_client.sql to wipe data for new clients
 - **Offline queue for photos, check-ins, and reports** - All saved to localStorage when no signal, auto-sync when back online
 - Fixed DetalleOrden bottom padding (pb-56) so photos aren't hidden by action buttons
 - Fixed auth initialization timeout with noOpLock
