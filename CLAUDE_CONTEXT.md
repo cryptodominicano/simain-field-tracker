@@ -132,7 +132,7 @@ Added automatic compression for images >1MB:
 ```
 
 ## Recent Changes (Dec 2024)
-- **Offline photo queue** - Photos saved to localStorage when no signal, auto-sync when back online
+- **Offline photo queue** - Photos saved to localStorage when no signal, auto-sync when back online, auto-refresh UI after sync
 - Fixed auth initialization timeout with noOpLock
 - Added robust file upload error handling with 60s timeout
 - Added HEIC/HEIF support for iOS photos
