@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { entities } from '@/api';
 import { createPageUrl } from '@/utils';
+import { useOfflineSync } from '@/hooks/useOfflineSync';
 import {
   Home,
   ClipboardList,
@@ -17,7 +18,8 @@ import {
   LogOut,
   MapPin,
   Settings,
-  Loader2
+  Loader2,
+  CloudOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +30,7 @@ export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const { pendingCount, isSyncing } = useOfflineSync();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -166,6 +169,17 @@ export default function Layout({ children, currentPageName }) {
                     <p className="font-semibold text-gray-900">{userProfile?.nombre_completo?.split(' ')[0] || 'Técnico'}</p>
                   </div>
                 </Link>
+                {/* Pending photos indicator */}
+                {pendingCount > 0 && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+                    {isSyncing ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <CloudOff className="h-3 w-3" />
+                    )}
+                    <span>{pendingCount} foto{pendingCount > 1 ? 's' : ''}</span>
+                  </div>
+                )}
                 <Link to={createPageUrl('Notificaciones')}>
                   <Button variant="ghost" size="icon" className="relative">
                     <Bell className="h-5 w-5 text-gray-600" />
@@ -298,6 +312,17 @@ export default function Layout({ children, currentPageName }) {
                 <div className="flex-1 lg:flex-none" />
                 
                 <div className="flex items-center gap-3">
+                  {/* Pending photos indicator */}
+                  {pendingCount > 0 && (
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+                      {isSyncing ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <CloudOff className="h-3 w-3" />
+                      )}
+                      <span>{pendingCount} foto{pendingCount > 1 ? 's' : ''} pendiente{pendingCount > 1 ? 's' : ''}</span>
+                    </div>
+                  )}
                   <Link to={createPageUrl('Notificaciones')}>
                     <Button variant="ghost" size="icon" className="relative">
                       <Bell className="h-5 w-5 text-gray-600" />

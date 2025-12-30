@@ -18,15 +18,17 @@ Storage: "photos" bucket (public = true)
 
 ## Key Files
 - src/api/supabaseClient.js - DB client with noOpLock fix
-- src/api/storage.js - File uploads with timeout & error handling
+- src/api/storage.js - File uploads with timeout, error handling & offline queue
 - src/api/auth.js - Authentication
 - src/contexts/AuthContext.jsx - Auth state
 - src/pages/DetalleOrden.jsx - Order detail with photo upload
 - src/pages/Layout.jsx - Main layout component
+- src/utils/offlineQueue.js - Offline photo queue (localStorage)
+- src/hooks/useOfflineSync.js - Auto-sync when back online
 - supabase/schema.sql - DB schema
 
 ## Current Task
-Debugging mobile photo upload issue - works on desktop, spins without error on mobile
+None - ready for new work
 
 ## Mobile Photo Upload Issue - Debugging Log
 
@@ -130,6 +132,7 @@ Added automatic compression for images >1MB:
 ```
 
 ## Recent Changes (Dec 2024)
+- **Offline photo queue** - Photos saved to localStorage when no signal, auto-sync when back online
 - Fixed auth initialization timeout with noOpLock
 - Added robust file upload error handling with 60s timeout
 - Added HEIC/HEIF support for iOS photos
@@ -146,5 +149,7 @@ Added automatic compression for images >1MB:
 - tecnico@simain.do (tecnico) - use for mobile testing
 
 ## Known Issues
-- Mobile photo upload not working (debugging in progress)
 - Need to test HEIC conversion for non-Safari browsers
+
+## Resolved Issues
+- Mobile photo upload (Dec 29, 2024) - Fixed with image compression, retry logic, and 90s timeout

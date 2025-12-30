@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { savePendingPhoto } from '../utils/offlineQueue';
 
 const BUCKET_NAME = 'photos';
 const UPLOAD_TIMEOUT_MS = 90000; // 90 seconds for slow mobile networks
@@ -91,12 +92,27 @@ export const storage = {
   /**
    * Upload a file to Supabase Storage
    * Compatible with Base44's UploadFile integration
-   * @param {object} options - { file: File, onProgress?: (percent: number) => void }
-   * @returns {Promise<{ file_url: string }>}
+   * @param {object} options - { file: File, onProgress?: (percent: number) => void, metadata?: object }
+   * @returns {Promise<{ file_url: string } | { offline: true, message: string, pendingId: string }>}
    */
-  async uploadFile({ file, onProgress }) {
+  async uploadFile({ file, onProgress, metadata = {} }) {
     try {
       console.log('[STORAGE] uploadFile called with:', { name: file.name, type: file.type, size: file.size });
+
+      // Check if offline - save to queue instead
+      if (!navigator.onLine) {
+        console.log('[STORAGE] Offline detected, saving to queue');
+        const pendingId = await savePendingPhoto(file, {
+          fileName: file.name,
+          fileType: file.type,
+          ...metadata
+        });
+        return {
+          offline: true,
+          message: 'Guardado localmente - se subirá cuando vuelvas a conectarte',
+          pendingId
+        };
+      }
 
       // Validate file
       validateFile(file);

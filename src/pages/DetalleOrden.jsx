@@ -270,13 +270,37 @@ export default function DetalleOrden() {
       setUploadStatus(prev => prev + '\n4. Subiendo a Supabase...');
       let file_url = null;
       let uploadError = null;
+      let isOffline = false;
+
+      // Prepare metadata for offline queue
+      const photoMetadata = {
+        orden_trabajo_id: ordenId,
+        numero_orden: orden.numero_orden,
+        subido_por_id: userProfile.id,
+        subido_por_nombre: userProfile.nombre_completo,
+        tipo_foto: photoData.tipo_foto,
+        descripcion: photoData.descripcion,
+        latitud: lat,
+        longitud: lon
+      };
 
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           if (attempt > 1) {
             setUploadStatus(prev => prev.replace(/Subiendo.*/, `Subiendo (intento ${attempt}/3)...`));
           }
-          const result = await integrations.Core.UploadFile({ file: fileToUpload });
+          const result = await integrations.Core.UploadFile({
+            file: fileToUpload,
+            metadata: photoMetadata
+          });
+
+          // Check if saved offline
+          if (result.offline) {
+            isOffline = true;
+            setUploadStatus(prev => prev.replace(/Subiendo.*/, '📱 Guardado localmente'));
+            break;
+          }
+
           file_url = result.file_url;
           break; // Success, exit retry loop
         } catch (err) {
@@ -286,6 +310,20 @@ export default function DetalleOrden() {
             await new Promise(r => setTimeout(r, attempt * 1000));
           }
         }
+      }
+
+      if (isOffline) {
+        // Photo saved to offline queue
+        setUploadStatus('📱 Sin conexión - foto guardada localmente');
+        toast.success('Sin conexión - foto guardada localmente', {
+          description: 'Se subirá automáticamente cuando vuelvas a conectarte'
+        });
+        setTimeout(() => {
+          setShowPhotoDialog(false);
+          setPhotoData({ tipo_foto: 'Durante', descripcion: '' });
+          setUploadStatus('');
+        }, 1500);
+        return;
       }
 
       if (!file_url) {
