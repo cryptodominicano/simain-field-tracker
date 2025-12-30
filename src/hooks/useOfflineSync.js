@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { getPendingPhotos, getPendingCount, removePendingPhoto, pendingPhotoToFile } from '../utils/offlineQueue';
 import { integrations, entities } from '../api';
 import { toast } from 'sonner';
@@ -12,6 +13,7 @@ import { toast } from 'sonner';
 export function useOfflineSync() {
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setSyncing] = useState(false);
+  const queryClient = useQueryClient();
 
   // Update pending count
   const refreshCount = useCallback(() => {
@@ -73,12 +75,14 @@ export function useOfflineSync() {
     refreshCount();
 
     if (successCount > 0) {
+      // Invalidate photo queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ['fotos-orden'] });
       toast.success(`${successCount} foto${successCount > 1 ? 's' : ''} sincronizada${successCount > 1 ? 's' : ''}`);
     }
     if (failCount > 0) {
       toast.error(`${failCount} foto${failCount > 1 ? 's' : ''} no se pudo${failCount > 1 ? 'ieron' : ''} sincronizar`);
     }
-  }, [refreshCount]);
+  }, [refreshCount, queryClient]);
 
   // Listen for online events
   useEffect(() => {
