@@ -1,5 +1,6 @@
 import Layout from "./Layout.jsx";
 import Login from "./Login";
+import ResetPassword from "./ResetPassword";
 import CertificacionesEquipo from "./CertificacionesEquipo";
 import CompletarReporte from "./CompletarReporte";
 import CrearOrden from "./CrearOrden";
@@ -68,11 +69,12 @@ function PagesContent() {
     const location = useLocation();
     const currentPage = _getCurrentPage(location.pathname);
 
-    // Don't wrap login page with Layout
-    if (location.pathname === '/login') {
+    // Don't wrap login and reset-password pages with Layout
+    if (location.pathname === '/login' || location.pathname === '/reset-password') {
         return (
             <Routes>
                 <Route path="/login" element={<Login />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
             </Routes>
         );
     }

@@ -102,6 +102,39 @@ export const auth = {
   },
 
   /**
+   * Invite a new user by email (admin only)
+   * Sends an invite email where user can set their password
+   */
+  async inviteUser({ email, nombre_completo, rol = 'tecnico', telefono = '', cedula = '' }) {
+    // Use signUp with a temporary random password
+    // The user will need to use "forgot password" to set their own
+    const tempPassword = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12).toUpperCase() + '!1';
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password: tempPassword,
+      options: {
+        data: {
+          nombre_completo,
+          rol,
+          telefono,
+          cedula
+        },
+        emailRedirectTo: `${window.location.origin}/login`
+      }
+    });
+
+    if (error) throw error;
+
+    // Immediately send password reset so user can set their own password
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`
+    });
+
+    return data;
+  },
+
+  /**
    * Subscribe to auth state changes
    */
   onAuthStateChange(callback) {

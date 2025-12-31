@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { entities } from '@/api';
+import { entities, auth } from '@/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,17 +11,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { 
-  Search, 
-  Plus, 
-  Edit, 
-  UserCheck, 
-  UserX, 
+import {
+  Search,
+  Plus,
+  Edit,
+  UserCheck,
+  UserX,
   Trash2,
   Loader2,
   Shield,
   User,
-  Users
+  Users,
+  Mail,
+  Send
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -32,12 +34,14 @@ export default function GestionUsuarios() {
   const [editingUser, setEditingUser] = useState(null);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
+    email: '',
     nombre_completo: '',
     telefono: '',
     cedula: '',
     rol: 'tecnico',
     activo: true
   });
+  const [sendingInvite, setSendingInvite] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -61,21 +65,45 @@ export default function GestionUsuarios() {
       return;
     }
 
+    // For new users, email is required
+    if (!editingUser && !formData.email) {
+      toast.error('El correo electrónico es requerido para nuevos usuarios');
+      return;
+    }
+
+    // Validate email format
+    if (!editingUser && formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      toast.error('Ingrese un correo electrónico válido');
+      return;
+    }
+
     setSaving(true);
 
     try {
       if (editingUser) {
-        await entities.usuarios.update(editingUser.id, formData);
+        // Update existing user (profile data only)
+        const { email, ...updateData } = formData;
+        await entities.usuarios.update(editingUser.id, updateData);
         toast.success('Usuario actualizado');
       } else {
-        await entities.usuarios.create(formData);
-        toast.success('Usuario creado');
+        // Create new user with auth invite
+        await auth.inviteUser({
+          email: formData.email,
+          nombre_completo: formData.nombre_completo,
+          rol: formData.rol,
+          telefono: formData.telefono,
+          cedula: formData.cedula
+        });
+        toast.success('Usuario invitado exitosamente', {
+          description: `Se envió un correo a ${formData.email} para establecer contraseña`
+        });
       }
-      
+
       queryClient.invalidateQueries(['usuarios-all']);
       setShowAddDialog(false);
       setEditingUser(null);
       setFormData({
+        email: '',
         nombre_completo: '',
         telefono: '',
         cedula: '',
@@ -83,7 +111,12 @@ export default function GestionUsuarios() {
         activo: true
       });
     } catch (error) {
-      toast.error('Error al guardar');
+      console.error('Error saving user:', error);
+      if (error.message?.includes('already registered')) {
+        toast.error('Este correo ya está registrado');
+      } else {
+        toast.error(error.message || 'Error al guardar');
+      }
     } finally {
       setSaving(false);
     }
@@ -114,6 +147,7 @@ export default function GestionUsuarios() {
   const openEdit = (usuario) => {
     setEditingUser(usuario);
     setFormData({
+      email: '', // Email can't be changed after creation
       nombre_completo: usuario.nombre_completo || '',
       telefono: usuario.telefono || '',
       cedula: usuario.cedula || '',
@@ -121,6 +155,25 @@ export default function GestionUsuarios() {
       activo: usuario.activo
     });
     setShowAddDialog(true);
+  };
+
+  const resendInvite = async (usuario) => {
+    if (!usuario.created_by) {
+      toast.error('Este usuario no tiene correo registrado');
+      return;
+    }
+
+    setSendingInvite(true);
+    try {
+      await auth.resetPassword(usuario.created_by);
+      toast.success('Invitación reenviada', {
+        description: `Se envió un correo a ${usuario.created_by}`
+      });
+    } catch (error) {
+      toast.error('Error al reenviar invitación');
+    } finally {
+      setSendingInvite(false);
+    }
   };
 
   const getRolBadge = (rol) => {
@@ -164,11 +217,12 @@ export default function GestionUsuarios() {
           <h1 className="text-2xl font-bold text-gray-900">Gestión de Usuarios</h1>
           <p className="text-gray-500 mt-1">{usuarios.length} usuarios registrados</p>
         </div>
-        <Button 
+        <Button
           className="bg-blue-600 hover:bg-blue-700"
           onClick={() => {
             setEditingUser(null);
             setFormData({
+              email: '',
               nombre_completo: '',
               telefono: '',
               cedula: '',
@@ -179,7 +233,7 @@ export default function GestionUsuarios() {
           }}
         >
           <Plus className="h-4 w-4 mr-2" />
-          Agregar Usuario
+          Invitar Usuario
         </Button>
       </div>
 
@@ -309,18 +363,31 @@ export default function GestionUsuarios() {
                       }
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button 
-                          variant="ghost" 
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
                           size="icon"
                           onClick={() => openEdit(usuario)}
+                          title="Editar"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
+                        {usuario.created_by && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => resendInvite(usuario)}
+                            disabled={sendingInvite}
+                            title="Reenviar invitación"
+                          >
+                            <Mail className="h-4 w-4 text-blue-600" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
                           size="icon"
                           onClick={() => toggleActivo(usuario)}
+                          title={usuario.activo ? 'Desactivar' : 'Activar'}
                         >
                           {usuario.activo ? (
                             <UserX className="h-4 w-4 text-amber-600" />
@@ -328,10 +395,11 @@ export default function GestionUsuarios() {
                             <UserCheck className="h-4 w-4 text-green-600" />
                           )}
                         </Button>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="icon"
                           onClick={() => deleteUser(usuario)}
+                          title="Eliminar"
                         >
                           <Trash2 className="h-4 w-4 text-red-600" />
                         </Button>
@@ -350,10 +418,28 @@ export default function GestionUsuarios() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {editingUser ? 'Editar Usuario' : 'Agregar Usuario'}
+              {editingUser ? 'Editar Usuario' : 'Invitar Nuevo Usuario'}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {!editingUser && (
+              <div>
+                <Label>Correo Electrónico *</Label>
+                <div className="relative mt-1">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    placeholder="usuario@empresa.com"
+                    className="pl-10"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Se enviará un correo para establecer contraseña
+                </p>
+              </div>
+            )}
             <div>
               <Label>Nombre Completo *</Label>
               <Input
@@ -383,8 +469,8 @@ export default function GestionUsuarios() {
             </div>
             <div>
               <Label>Rol *</Label>
-              <Select 
-                value={formData.rol} 
+              <Select
+                value={formData.rol}
                 onValueChange={(v) => setFormData({...formData, rol: v})}
               >
                 <SelectTrigger className="mt-1">
@@ -398,19 +484,28 @@ export default function GestionUsuarios() {
               </Select>
             </div>
             <div className="flex gap-3 pt-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="flex-1"
                 onClick={() => setShowAddDialog(false)}
               >
                 Cancelar
               </Button>
-              <Button 
+              <Button
                 className="flex-1 bg-blue-600 hover:bg-blue-700"
                 onClick={handleSave}
                 disabled={saving}
               >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Guardar'}
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : editingUser ? (
+                  'Guardar'
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Enviar Invitación
+                  </>
+                )}
               </Button>
             </div>
           </div>
